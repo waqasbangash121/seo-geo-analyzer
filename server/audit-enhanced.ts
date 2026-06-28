@@ -1,5 +1,4 @@
-import { SiteCrawler } from "@waqashanifkhan/crawler";
-import type { CrawlAnalysis, CrawlPage } from "@waqashanifkhan/crawler";
+import { SiteCrawler, type CrawlAnalysis, type CrawlPage } from "./crawl";
 
 export interface TechnicalAuditItem {
   id: string;
