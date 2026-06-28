@@ -1,20 +1,59 @@
 {
   "name": "@seo-geo/analyzer",
   "version": "0.1.0",
-  "private": true,
+  "description": "Standalone SEO and GEO website analyzer for Node.js apps.",
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "exports": {
-    ".": "./src/index.ts"
+  "license": "MIT",
+  "author": "Waqas Bangash",
+  "homepage": "https://github.com/waqasbangash121/seo-geo-analyzer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/waqasbangash121/seo-geo-analyzer.git",
+    "directory": "packages/analyzer"
   },
+  "bugs": {
+    "url": "https://github.com/waqasbangash121/seo-geo-analyzer/issues"
+  },
+  "keywords": [
+    "seo",
+    "geo",
+    "ai-search",
+    "website-audit",
+    "crawler",
+    "structured-data",
+    "schema-org"
+  ],
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "check": "tsc --noEmit -p tsconfig.json"
+    "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json",
+    "prepublishOnly": "pnpm clean && pnpm build"
   },
   "dependencies": {
     "cheerio": "^1.2.0"
   },
   "devDependencies": {
+    "@types/node": "^24.7.0",
     "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
