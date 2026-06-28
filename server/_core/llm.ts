@@ -72,8 +72,6 @@ export type InvokeParams = {
   responseFormat?: ResponseFormat;
   response_format?: ResponseFormat;
   model?: string;
-  thinking?: Record<string, unknown>;
-  reasoning?: Record<string, unknown>;
 };
 
 export type ToolCall = {
@@ -118,9 +116,29 @@ export type ResponseFormat =
   | { type: "json_object" }
   | { type: "json_schema"; json_schema: JsonSchema };
 
-const ensureArray = (
-  value: MessageContent | MessageContent[]
-): MessageContent[] => (Array.isArray(value) ? value : [value]);
+export type ModelInfo = {
+  id: string;
+  object: string;
+  created: number;
+  owned_by: string;
+};
+
+export type ModelsResponse = {
+  object: string;
+  data: ModelInfo[];
+};
+
+const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_MODELS_URL = "https://api.openai.com/v1/models";
+const DEFAULT_MODEL = "gpt-4.1-mini";
+const RETRY_MAX_RETRIES = 4;
+const RETRY_BASE_DELAY_MS = 500;
+const RETRY_MAX_DELAY_MS = 30_000;
+
+type FetchInit = NonNullable<Parameters<typeof fetch>[1]>;
+
+const ensureArray = (value: MessageContent | MessageContent[]): MessageContent[] =>
+  Array.isArray(value) ? value : [value];
 
 const normalizeContentPart = (
   part: MessageContent
@@ -129,15 +147,7 @@ const normalizeContentPart = (
     return { type: "text", text: part };
   }
 
-  if (part.type === "text") {
-    return part;
-  }
-
-  if (part.type === "image_url") {
-    return part;
-  }
-
-  if (part.type === "file_url") {
+  if (part.type === "text" || part.type === "image_url" || part.type === "file_url") {
     return part;
   }
 
@@ -148,21 +158,18 @@ const normalizeMessage = (message: Message) => {
   const { role, name, tool_call_id } = message;
 
   if (role === "tool" || role === "function") {
-    const content = ensureArray(message.content)
-      .map(part => (typeof part === "string" ? part : JSON.stringify(part)))
-      .join("\n");
-
     return {
       role,
       name,
       tool_call_id,
-      content,
+      content: ensureArray(message.content)
+        .map((part) => (typeof part === "string" ? part : JSON.stringify(part)))
+        .join("\n"),
     };
   }
 
   const contentParts = ensureArray(message.content).map(normalizeContentPart);
 
-  // If there's only text content, collapse to a single string for compatibility
   if (contentParts.length === 1 && contentParts[0].type === "text") {
     return {
       role,
@@ -190,15 +197,11 @@ const normalizeToolChoice = (
 
   if (toolChoice === "required") {
     if (!tools || tools.length === 0) {
-      throw new Error(
-        "tool_choice 'required' was provided but no tools were configured"
-      );
+      throw new Error("tool_choice 'required' was provided but no tools were configured");
     }
 
     if (tools.length > 1) {
-      throw new Error(
-        "tool_choice 'required' needs a single tool or specify the tool name explicitly"
-      );
+      throw new Error("tool_choice 'required' needs a single tool or specify the tool name explicitly");
     }
 
     return {
@@ -216,8 +219,6 @@ const normalizeToolChoice = (
 
   return toolChoice;
 };
-
-const resolveApiUrl = () => "https://api.openai.com/v1/chat/completions";
 
 const assertApiKey = () => {
   if (!ENV.openAiApiKey) {
@@ -246,9 +247,7 @@ const normalizeResponseFormat = ({
       explicitFormat.type === "json_schema" &&
       !explicitFormat.json_schema?.schema
     ) {
-      throw new Error(
-        "responseFormat json_schema requires a defined schema object"
-      );
+      throw new Error("responseFormat json_schema requires a defined schema object");
     }
     return explicitFormat;
   }
@@ -270,14 +269,8 @@ const normalizeResponseFormat = ({
   };
 };
 
-const RETRY_MAX_RETRIES = 4;
-const RETRY_BASE_DELAY_MS = 500;
-const RETRY_MAX_DELAY_MS = 30_000;
-
-type FetchInit = NonNullable<Parameters<typeof fetch>[1]>;
-
 const sleep = (ms: number) =>
-  new Promise<void>(resolve => setTimeout(resolve, ms));
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const parseRetryAfter = (value: string | null): number | undefined => {
   if (!value) return undefined;
@@ -287,20 +280,12 @@ const parseRetryAfter = (value: string | null): number | undefined => {
   return Number.isNaN(at) ? undefined : Math.max(0, at - Date.now());
 };
 
-// Equal-jitter exponential backoff. The cap/2 floor guarantees a minimum
-// delay so a misbehaving caller loop slows down instead of hammering the
-// upstream while it keeps returning errors.
-const computeBackoffDelay = (
-  attempt: number,
-  retryAfterMs?: number
-): number => {
+const computeBackoffDelay = (attempt: number, retryAfterMs?: number): number => {
   const cap = Math.min(RETRY_BASE_DELAY_MS * 2 ** attempt, RETRY_MAX_DELAY_MS);
   const jittered = cap / 2 + Math.random() * (cap / 2);
   return Math.min(Math.max(jittered, retryAfterMs ?? 0), RETRY_MAX_DELAY_MS);
 };
 
-// Retries non-2xx responses and network errors with exponential backoff, then
-// returns the final Response so callers keep their existing error handling.
 const fetchWithBackoff = async (
   url: string,
   init: FetchInit
@@ -321,14 +306,14 @@ const fetchWithBackoff = async (
         // Body already settled; nothing to clean up.
       }
       console.warn(
-        `LLM request retry ${attempt + 1}/${RETRY_MAX_RETRIES} after status ${response.status}`
+        `OpenAI request retry ${attempt + 1}/${RETRY_MAX_RETRIES} after status ${response.status}`
       );
       await sleep(computeBackoffDelay(attempt, retryAfterMs));
     } catch (error) {
       lastError = error;
       if (attempt === RETRY_MAX_RETRIES) throw error;
       console.warn(
-        `LLM request retry ${attempt + 1}/${RETRY_MAX_RETRIES} after network error`
+        `OpenAI request retry ${attempt + 1}/${RETRY_MAX_RETRIES} after network error`
       );
       await sleep(computeBackoffDelay(attempt));
     }
@@ -336,7 +321,7 @@ const fetchWithBackoff = async (
 
   throw lastError instanceof Error
     ? lastError
-    : new Error("LLM request failed after exhausting retries");
+    : new Error("OpenAI request failed after exhausting retries");
 };
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
@@ -352,14 +337,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     responseFormat,
     response_format,
     model,
-    thinking,
-    reasoning,
     maxTokens,
     max_tokens,
   } = params;
 
   const payload: Record<string, unknown> = {
-    model: model ?? "gpt-4.1-mini",
+    model: model ?? DEFAULT_MODEL,
     messages: messages.map(normalizeMessage),
   };
 
@@ -380,13 +363,6 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.max_tokens = resolvedMaxTokens;
   }
 
-  // if (thinking) {
-  //   payload.thinking = thinking;
-  // }
-  // if (reasoning) {
-  //   payload.reasoning = reasoning;
-  // }
-
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
     response_format,
@@ -398,7 +374,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetchWithBackoff(resolveApiUrl(), {
+  const response = await fetchWithBackoff(OPENAI_CHAT_COMPLETIONS_URL, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -410,41 +386,24 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
+      `OpenAI invoke failed: ${response.status} ${response.statusText} - ${errorText}`
     );
   }
 
   return (await response.json()) as InvokeResult;
 }
 
-export type ModelInfo = {
-  id: string;
-  object: string;
-  created: number;
-  owned_by: string;
-};
-
-export type ModelsResponse = {
-  object: string;
-  data: ModelInfo[];
-};
-
 export async function listLLMModels(): Promise<ModelsResponse> {
   assertApiKey();
 
-  const url =
-    ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-      ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/models`
-      : "https://forge.manus.im/v1/models";
-
-  const response = await fetchWithBackoff(url, {
-    headers: { authorization: `Bearer ${ENV.forgeApiKey}` },
+  const response = await fetchWithBackoff(OPENAI_MODELS_URL, {
+    headers: { authorization: `Bearer ${ENV.openAiApiKey}` },
   });
 
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(
-      `List LLM models failed: ${response.status} ${response.statusText} – ${errorText}`
+      `List OpenAI models failed: ${response.status} ${response.statusText} - ${errorText}`
     );
   }
 
