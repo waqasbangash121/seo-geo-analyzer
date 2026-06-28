@@ -12,27 +12,31 @@ export {
 
 export {
   GeoAnalyzer,
+  type Entity,
   type GeoAnalysis,
-  type GeoCompetitor,
-  type GeoEntity,
-  type GeoRecommendation,
+  type GeoScore,
 } from "../../../server/geo";
 
 export {
   ResearchEngine,
-  type CompetitorInsight,
-  type KeywordOpportunity,
-  type ResearchReport,
+  type Competitor,
+  type ContentGap,
+  type FaqSuggestion,
+  type Keyword,
+  type ResearchAnalysis,
+  type SnippetOpportunity,
 } from "../../../server/research";
 
 export {
   SchemaAuditEngine,
+  cleanBrandName,
   type SchemaAuditResult,
+  type SchemaRecommendation,
 } from "../../../server/schema-audit";
 
 export {
   buildActionPlan,
-  type ActionPlanItem,
+  type ActionItem,
 } from "../../../server/action-plan";
 
 import { EnhancedAuditEngine } from "../../../server/audit-enhanced";
