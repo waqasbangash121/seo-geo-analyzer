@@ -1,13 +1,54 @@
 {
   "name": "@seo-geo/crawler",
   "version": "1.0.0",
-  "private": true,
+  "description": "A lightweight crawler utility for SEO and GEO website analysis.",
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "pnpm run clean && pnpm run build",
+    "pack:check": "pnpm run build && npm pack --dry-run"
+  },
+  "keywords": [
+    "seo",
+    "geo",
+    "crawler",
+    "website-audit",
+    "technical-seo"
+  ],
+  "author": "Waqas Bangash",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/waqasbangash121/seo-geo-analyzer.git",
+    "directory": "packages/crawler"
+  },
+  "bugs": {
+    "url": "https://github.com/waqasbangash121/seo-geo-analyzer/issues"
+  },
+  "homepage": "https://github.com/waqasbangash121/seo-geo-analyzer#readme",
   "dependencies": {
     "cheerio": "^1.2.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
