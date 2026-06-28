@@ -14,6 +14,60 @@ import { z } from "zod";
 import { eq, desc } from "drizzle-orm";
 import { safeParse, buildHistoryRow } from "./auditHistory";
 
+function clampScore(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function calculateResearchScore(research: Awaited<ReturnType<ResearchEngine["analyze"]>> | null): number {
+  if (!research) return 0;
+
+  const keywordScore = Math.min(100, (research.keywords?.length ?? 0) * 8);
+  const competitorScore = Math.min(100, (research.competitors?.length ?? 0) * 16);
+  const contentGapScore = Math.min(100, (research.contentGaps?.length ?? 0) * 16);
+  const snippetScore = Math.min(100, (research.snippetOpportunities?.length ?? 0) * 16);
+  const faqScore = Math.min(100, (research.faqSuggestions?.length ?? 0) * 5);
+
+  return clampScore(
+    keywordScore * 0.25 +
+      competitorScore * 0.2 +
+      contentGapScore * 0.2 +
+      snippetScore * 0.2 +
+      faqScore * 0.15
+  );
+}
+
+function calculateSchemaScore(schema: ReturnType<SchemaAuditEngine["analyze"]> | null): number {
+  if (!schema) return 0;
+  return clampScore(schema.coveragePercent ?? 0);
+}
+
+function calculateOverallScore(input: {
+  technicalScore: number;
+  geoScore: number;
+  schemaScore: number;
+  researchScore: number;
+  hasGeo: boolean;
+  hasResearch: boolean;
+}): number {
+  const weights = {
+    technical: 0.45,
+    geo: input.hasGeo ? 0.35 : 0,
+    schema: 0.1,
+    research: input.hasResearch ? 0.1 : 0,
+  };
+
+  const totalWeight = weights.technical + weights.geo + weights.schema + weights.research;
+
+  return clampScore(
+    (input.technicalScore * weights.technical +
+      input.geoScore * weights.geo +
+      input.schemaScore * weights.schema +
+      input.researchScore * weights.research) /
+      totalWeight
+  );
+}
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -28,7 +82,6 @@ export const appRouter = router({
   }),
 
   audit: router({
-    // Full comprehensive analysis: technical + GEO + research
     analyze: publicProcedure
       .input(z.object({ url: z.string().url(), includeResearch: z.boolean().optional() }))
       .mutation(async ({ input }) => {
@@ -37,9 +90,9 @@ export const appRouter = router({
           const technical = await engine.performAudit(input.url);
           const pages = engine.lastCrawledPages;
 
-          // Run GEO and research in parallel (both use LLM with fallbacks)
           const geoAnalyzer = new GeoAnalyzer();
           const researchEngine = new ResearchEngine();
+          const schemaEngine = new SchemaAuditEngine();
 
           const [geo, research] = await Promise.all([
             geoAnalyzer.analyze(input.url, pages).catch((e) => {
@@ -54,16 +107,19 @@ export const appRouter = router({
                 }),
           ]);
 
-          // Schema markup audit (deterministic, no LLM)
-          const schemaEngine = new SchemaAuditEngine();
           const schema = schemaEngine.analyze(input.url, pages, technical.crawlAnalysis);
+          const geoScore = clampScore(geo?.overallGeoScore ?? 0);
+          const schemaScore = calculateSchemaScore(schema);
+          const researchScore = calculateResearchScore(research);
+          const combinedOverall = calculateOverallScore({
+            technicalScore: technical.overallScore,
+            geoScore,
+            schemaScore,
+            researchScore,
+            hasGeo: Boolean(geo),
+            hasResearch: Boolean(research),
+          });
 
-          const geoScore = geo?.overallGeoScore ?? 0;
-          const combinedOverall = geo
-            ? Math.round((technical.overallScore + geoScore) / 2)
-            : technical.overallScore;
-
-          // Prioritized action plan aggregated from all engines
           const actionPlan = buildActionPlan({
             technicalAudit: technical.technicalAudit,
             geo,
@@ -80,11 +136,21 @@ export const appRouter = router({
               geo,
               research,
               schema,
+              schemaScore,
+              researchScore,
               actionPlan,
+              pipeline: {
+                crawledPages: pages.length,
+                technicalComplete: true,
+                geoComplete: Boolean(geo),
+                researchComplete: Boolean(research),
+                schemaComplete: Boolean(schema),
+              },
             },
           };
         } catch (error) {
-          // Fallback to basic single-page audit
+          console.error("[Audit] enhanced pipeline failed, using basic fallback:", error);
+
           const { content, auditItems, scores } = await analyzeWebpage(input.url);
 
           return {
@@ -100,8 +166,12 @@ export const appRouter = router({
               performanceScore: 75,
               accessibilityScore: 75,
               geoScore: 0,
+              schemaScore: 0,
+              researchScore: 0,
               geo: null,
               research: null,
+              schema: null,
+              actionPlan: [],
               technicalAudit: auditItems,
               auditItems,
               statusCode: content.statusCode,
@@ -128,11 +198,19 @@ export const appRouter = router({
                   other: [],
                 },
               },
+              pipeline: {
+                crawledPages: 1,
+                technicalComplete: true,
+                geoComplete: false,
+                researchComplete: false,
+                schemaComplete: false,
+                fallback: true,
+              },
               summary: {
                 totalPages: 1,
                 avgLoadTime: 0,
                 issuesFound: auditItems.length,
-                criticalIssues: 0,
+                criticalIssues: auditItems.filter((item) => item.impact === "critical").length,
               },
             },
           };
@@ -176,7 +254,6 @@ export const appRouter = router({
           seoScore: row.seoScore,
           geoScore: row.geoScore,
           auditItems: row.auditItems,
-          // Persist the caller-provided full report snapshot when present.
           fullReport: input.fullReport ? JSON.stringify(input.fullReport) : null,
           pageTitle: row.pageTitle,
           pageDescription: row.pageDescription,
