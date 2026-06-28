@@ -124,6 +124,8 @@ export interface CoreWebVitals {
   estCLS: number;
   estINP: number;
   rating: "good" | "needs-improvement" | "poor";
+  avgPageSizeKb?: number;
+  note?: string;
 }
 
 export interface CrawlAnalysis {
@@ -136,7 +138,19 @@ export interface CrawlAnalysis {
   canonicalIssues: { page: string; issue: string }[];
   noindexPages: string[];
   duplicateContentRisks?: any[];
+  internalLinkingGraph?: any;
   pageTypes?: Record<string, any[]>;
+  robots?: {
+    found: boolean;
+    hasSitemapDirective: boolean;
+    disallowsAll: boolean;
+    sitemapUrls: string[];
+  };
+  sitemap?: {
+    found: boolean;
+    url: string;
+    urlCount: number;
+  };
   performance?: {
     avgPageSizeKb: number;
     estLCP: number;
@@ -154,6 +168,15 @@ export interface CrawlAnalysis {
   };
 }
 
+export interface AuditPipelineStatus {
+  crawledPages: number;
+  technicalComplete: boolean;
+  geoComplete: boolean;
+  researchComplete: boolean;
+  schemaComplete: boolean;
+  fallback?: boolean;
+}
+
 export interface AuditReport {
   url: string;
   domain: string;
@@ -162,6 +185,8 @@ export interface AuditReport {
   overallScore: number;
   seoScore: number;
   geoScore: number;
+  schemaScore?: number;
+  researchScore?: number;
   technicalScore?: number;
   performanceScore?: number;
   accessibilityScore?: number;
@@ -173,6 +198,7 @@ export interface AuditReport {
   schema?: SchemaAuditResult | null;
   actionPlan?: ActionItem[];
   coreWebVitals?: CoreWebVitals;
+  pipeline?: AuditPipelineStatus;
   summary?: {
     totalPages: number;
     avgLoadTime: number;
