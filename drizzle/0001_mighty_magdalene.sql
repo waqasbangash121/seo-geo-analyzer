@@ -1,0 +1,1 @@
+ALTER TABLE `auditResults` ADD `fullReport` text;
