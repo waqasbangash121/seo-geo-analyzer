@@ -10,6 +10,7 @@
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "check:packages": "pnpm --filter @seo-geo/analyzer check",
+    "build:packages": "pnpm --filter @seo-geo/analyzer build",
     "format": "prettier --write .",
     "test": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"

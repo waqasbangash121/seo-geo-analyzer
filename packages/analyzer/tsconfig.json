@@ -1,20 +1,19 @@
 {
-  "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "noEmit": true,
-    "composite": false,
-    "rootDir": "../.."
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": [
-    "src/**/*",
-    "../../server/audit-enhanced.ts",
-    "../../server/action-plan.ts",
-    "../../server/crawl.ts",
-    "../../server/geo.ts",
-    "../../server/research.ts",
-    "../../server/schema-audit.ts",
-    "../../server/_core/llm.ts",
-    "../../server/_core/env.ts"
-  ],
-  "exclude": ["../../node_modules", "../../dist", "../../**/*.test.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }

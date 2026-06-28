@@ -1,38 +1,101 @@
 # @seo-geo/analyzer
 
-Reusable SEO/GEO analysis package for pnpm workspace consumers.
+Standalone SEO and GEO website analyzer for Node.js apps.
 
-## Usage inside another pnpm workspace project
+It crawls a website, checks technical SEO basics, reviews schema coverage, estimates performance signals, and returns a prioritized action plan.
 
-Add the package to the consuming app:
+## Install
 
 ```bash
-pnpm add @seo-geo/analyzer@workspace:*
+pnpm add @seo-geo/analyzer
 ```
 
-Then import the analyzer API:
+or:
+
+```bash
+npm install @seo-geo/analyzer
+```
+
+## Usage
 
 ```ts
 import { analyzeWebsite } from "@seo-geo/analyzer";
 
 const report = await analyzeWebsite({
   url: "https://example.com",
+  maxPages: 25,
 });
 
 console.log(report.overallScore);
 console.log(report.technicalAudit);
+console.log(report.schema.recommendations);
+console.log(report.actionPlan);
 ```
 
-## Available exports
+You can also use the shorter alias:
 
-- `analyzeWebsite`
-- `EnhancedAuditEngine`
-- `SiteCrawler`
-- `GeoAnalyzer`
-- `ResearchEngine`
-- `SchemaAuditEngine`
-- `buildActionPlan`
+```ts
+import { analyze } from "@seo-geo/analyzer";
 
-## Notes
+const report = await analyze({ url: "https://example.com" });
+```
 
-This package currently exposes the existing analyzer implementation through a workspace package facade. The next refactor step should move the analyzer source files fully into this package so it can be published independently outside the monorepo.
+## API
+
+### `analyzeWebsite(options)`
+
+```ts
+type AnalyzeWebsiteOptions = {
+  url: string;
+  maxPages?: number;
+  timeoutMs?: number;
+  userAgent?: string;
+};
+```
+
+Returns an `EnhancedAuditResult` with:
+
+- `overallScore`
+- `seoScore`
+- `technicalScore`
+- `performanceScore`
+- `accessibilityScore`
+- `crawlAnalysis`
+- `technicalAudit`
+- `schema`
+- `actionPlan`
+- `summary`
+
+## Advanced usage
+
+```ts
+import { EnhancedAuditEngine, SiteCrawler, SchemaAuditEngine } from "@seo-geo/analyzer";
+
+const engine = new EnhancedAuditEngine({ maxPages: 10 });
+const result = await engine.performAudit("https://example.com");
+```
+
+## Build locally
+
+```bash
+pnpm --filter @seo-geo/analyzer build
+```
+
+## Publish
+
+```bash
+cd packages/analyzer
+pnpm build
+pnpm publish --access public
+```
+
+Make sure you are logged in first:
+
+```bash
+npm login
+```
+
+## Requirements
+
+- Node.js 20+
+- Publicly reachable website URL
