@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "rootDir": "../.."
+  },
+  "include": [
+    "src/**/*",
+    "../../server/audit-enhanced.ts",
+    "../../server/action-plan.ts",
+    "../../server/crawl.ts",
+    "../../server/geo.ts",
+    "../../server/research.ts",
+    "../../server/schema-audit.ts",
+    "../../server/_core/llm.ts",
+    "../../server/_core/env.ts"
+  ],
+  "exclude": ["../../node_modules", "../../dist", "../../**/*.test.ts"]
+}
