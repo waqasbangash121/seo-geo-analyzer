@@ -115,6 +115,9 @@ importers:
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@5.9.3)
+      '@waqashanifkhan/crawler':
+        specifier: workspace:*
+        version: link:packages/crawler
       axios:
         specifier: ^1.12.2
         version: 1.12.2

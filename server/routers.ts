@@ -19,13 +19,24 @@ function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function calculateResearchScore(research: Awaited<ReturnType<ResearchEngine["analyze"]>> | null): number {
+function calculateResearchScore(
+  research: Awaited<ReturnType<ResearchEngine["analyze"]>> | null
+): number {
   if (!research) return 0;
 
   const keywordScore = Math.min(100, (research.keywords?.length ?? 0) * 8);
-  const competitorScore = Math.min(100, (research.competitors?.length ?? 0) * 16);
-  const contentGapScore = Math.min(100, (research.contentGaps?.length ?? 0) * 16);
-  const snippetScore = Math.min(100, (research.snippetOpportunities?.length ?? 0) * 16);
+  const competitorScore = Math.min(
+    100,
+    (research.competitors?.length ?? 0) * 16
+  );
+  const contentGapScore = Math.min(
+    100,
+    (research.contentGaps?.length ?? 0) * 16
+  );
+  const snippetScore = Math.min(
+    100,
+    (research.snippetOpportunities?.length ?? 0) * 16
+  );
   const faqScore = Math.min(100, (research.faqSuggestions?.length ?? 0) * 5);
 
   return clampScore(
@@ -37,7 +48,9 @@ function calculateResearchScore(research: Awaited<ReturnType<ResearchEngine["ana
   );
 }
 
-function calculateSchemaScore(schema: ReturnType<SchemaAuditEngine["analyze"]> | null): number {
+function calculateSchemaScore(
+  schema: ReturnType<SchemaAuditEngine["analyze"]> | null
+): number {
   if (!schema) return 0;
   return clampScore(schema.coveragePercent ?? 0);
 }
@@ -57,7 +70,8 @@ function calculateOverallScore(input: {
     research: input.hasResearch ? 0.1 : 0,
   };
 
-  const totalWeight = weights.technical + weights.geo + weights.schema + weights.research;
+  const totalWeight =
+    weights.technical + weights.geo + weights.schema + weights.research;
 
   return clampScore(
     (input.technicalScore * weights.technical +
@@ -71,7 +85,7 @@ function calculateOverallScore(input: {
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
+    me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -83,7 +97,12 @@ export const appRouter = router({
 
   audit: router({
     analyze: publicProcedure
-      .input(z.object({ url: z.string().url(), includeResearch: z.boolean().optional() }))
+      .input(
+        z.object({
+          url: z.string().url(),
+          includeResearch: z.boolean().optional(),
+        })
+      )
       .mutation(async ({ input }) => {
         try {
           const engine = new EnhancedAuditEngine();
@@ -95,19 +114,23 @@ export const appRouter = router({
           const schemaEngine = new SchemaAuditEngine();
 
           const [geo, research] = await Promise.all([
-            geoAnalyzer.analyze(input.url, pages).catch((e) => {
+            geoAnalyzer.analyze(input.url, pages).catch(e => {
               console.error("[GEO] failed:", e);
               return null;
             }),
             input.includeResearch === false
               ? Promise.resolve(null)
-              : researchEngine.analyze(input.url, pages).catch((e) => {
+              : researchEngine.analyze(input.url, pages).catch(e => {
                   console.error("[Research] failed:", e);
                   return null;
                 }),
           ]);
 
-          const schema = schemaEngine.analyze(input.url, pages, technical.crawlAnalysis);
+          const schema = schemaEngine.analyze(
+            input.url,
+            pages,
+            technical.crawlAnalysis
+          );
           const geoScore = clampScore(geo?.overallGeoScore ?? 0);
           const schemaScore = calculateSchemaScore(schema);
           const researchScore = calculateResearchScore(research);
@@ -149,9 +172,14 @@ export const appRouter = router({
             },
           };
         } catch (error) {
-          console.error("[Audit] enhanced pipeline failed, using basic fallback:", error);
+          console.error(
+            "[Audit] enhanced pipeline failed, using basic fallback:",
+            error
+          );
 
-          const { content, auditItems, scores } = await analyzeWebpage(input.url);
+          const { content, auditItems, scores } = await analyzeWebpage(
+            input.url
+          );
 
           return {
             success: true,
@@ -210,7 +238,9 @@ export const appRouter = router({
                 totalPages: 1,
                 avgLoadTime: 0,
                 issuesFound: auditItems.length,
-                criticalIssues: auditItems.filter((item) => item.impact === "critical").length,
+                criticalIssues: auditItems.filter(
+                  item => item.status === "fail"
+                ).length,
               },
             },
           };
@@ -254,7 +284,9 @@ export const appRouter = router({
           seoScore: row.seoScore,
           geoScore: row.geoScore,
           auditItems: row.auditItems,
-          fullReport: input.fullReport ? JSON.stringify(input.fullReport) : null,
+          fullReport: input.fullReport
+            ? JSON.stringify(input.fullReport)
+            : null,
           pageTitle: row.pageTitle,
           pageDescription: row.pageDescription,
         });
@@ -273,7 +305,7 @@ export const appRouter = router({
         .orderBy(desc(auditResults.createdAt))
         .limit(50);
 
-      return results.map((r) => ({
+      return results.map(r => ({
         ...r,
         auditItems: safeParse(r.auditItems, []),
         fullReport: r.fullReport ? safeParse(r.fullReport, null) : null,
