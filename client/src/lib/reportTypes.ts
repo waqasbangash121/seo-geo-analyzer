@@ -103,6 +103,7 @@ export interface SchemaRecommendation {
 
 export interface SchemaAuditResult {
   detectedTypes: string[];
+  /** Schema types commonly expected for this kind of site but not found. */
   missingTypes: string[];
   pagesWithSchema: number;
   totalPages: number;
@@ -177,6 +178,63 @@ export interface AuditPipelineStatus {
   fallback?: boolean;
 }
 
+export type CrawlerSeverity = "critical" | "high" | "medium" | "low" | "info";
+
+export interface CrawlerRecommendation {
+  priority: number;
+  issueId: string;
+  title: string;
+  severity: CrawlerSeverity;
+  impact: "high" | "medium" | "low";
+  effort: "low" | "medium" | "high";
+  whatToFix: string;
+  howToFix: string[];
+  affectedUrls: string[];
+}
+
+export interface CrawlerAuditIssue {
+  id: string;
+  category: string;
+  severity: CrawlerSeverity;
+  status: "fail" | "warning" | "pass";
+  title: string;
+  summary: string;
+  whyItMatters: string;
+  affectedUrls: string[];
+  evidence: string[];
+  fix: {
+    summary: string;
+    steps: string[];
+  };
+  effort: "low" | "medium" | "high";
+}
+
+export interface CrawlerAuditReport {
+  auditedUrl: string;
+  domain: string;
+  generatedAt: string;
+  scores: {
+    overall: number;
+    technical: number;
+    seo: number;
+    content: number;
+    performance: number;
+    accessibility: number;
+    security: number;
+  };
+  summary: {
+    totalPagesCrawled: number;
+    averageLoadTimeMs: number;
+    totalIssues: number;
+    criticalIssues: number;
+    highPriorityIssues: number;
+    topPriorities: CrawlerRecommendation[];
+  };
+  issues: CrawlerAuditIssue[];
+  recommendations: CrawlerRecommendation[];
+  notes: string[];
+}
+
 export interface AuditReport {
   url: string;
   domain: string;
@@ -199,6 +257,7 @@ export interface AuditReport {
   actionPlan?: ActionItem[];
   coreWebVitals?: CoreWebVitals;
   pipeline?: AuditPipelineStatus;
+  crawlerAudit?: CrawlerAuditReport;
   summary?: {
     totalPages: number;
     avgLoadTime: number;
